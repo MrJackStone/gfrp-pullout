@@ -1,0 +1,210 @@
+bondedDepth=72
+unbondedDepth=39
+exposedLength=39
+
+elemSize=5
+
+/PREP7
+
+BLOCK,,150,,150,,150,  !creating cube
+
+wpstyl,0.05,10,-100,100,0.003,0,0,,5   !workplane setting
+wpoffs,,,36    !wp offset
+vsbw,all,,delete   !slicing
+wprota,,,90   !wp rotation
+wpoffs,,,75
+vsbw,all,,delete
+!!
+wprota,,-90                  !!
+wpoffs,,,150-unbondedDepth   !!
+vsbw,all,,delete             !!
+wpoffs,,,-bondedDepth        !!
+vsbw,all,,delete             !!
+!!
+wpstyl,,,,,,,,0 !turnoff wp display
+
+/VIEW,1,1,2,3    !Oblique view
+vplot
+
+
+!*    !Defining element Type
+ET,1,SOLID65
+!*
+ET,2,180
+!*
+ET,3,39
+!*    !Setting dof for bar element to Y direction only
+KEYOPT,3,1,0
+KEYOPT,3,2,0
+KEYOPT,3,3,2
+KEYOPT,3,4,0
+KEYOPT,3,6,0
+!*
+!*    !Defining Material Models
+MPTEMP,,,,,,,,
+MPTEMP,1,0
+MPDATA,EX,1,,2e5
+MPDATA,PRXY,1,,0.3
+TB,CONC,1,1,9,
+TBTEMP,0
+TBDATA,,0.2,0.8,6,50,,
+TBDATA,,,,,,,
+/DIST, 1 ,0.924021,1
+/REP,FAST
+MPTEMP,,,,,,,,
+MPTEMP,1,0
+MPDATA,EX,2,,2e5
+MPDATA,PRXY,2,,0.3
+TB,BISO,2,1,2,
+TBTEMP,0
+TBDATA,,600,0,,,,
+!*     !Defining section details (Bar-Link180)
+SECTYPE,1,LINK, ,sq1
+SECDATA,113.097,
+SECCONTROL,0,0
+
+R,1, , , , , , , !Real constants concrete-SOLID65
+RMORE, , , , , , ,
+RMORE, ,
+!*
+!*
+!!
+k0_points=15
+
+*dim,k0_forces,,k0_points
+k0_forces(1)=      0      ,  6975.029355, 17495.79589, 25982.16756, 27008.18659
+k0_forces(6)=  24347.05153, 22372.10061 , 21035.56154, 19620.57816, 18067.43507
+k0_forces(11)= 16613.90811, 15449.45794 , 14627.55699, 14108.57593, 13818.14198
+
+*dim,k0_displacements,,k0_points
+k0_displacements(1)=   0,  1,  2,  3,  4
+k0_displacements(6)=   5,  6,  7,  8,  9
+k0_displacements(11)= 10, 11, 12, 13, 14
+
+k0_linear=7e3
+!!
+
+!!
+!Real constant set for LINK180 !!
+R,3                            !!
+!!
+
+
+!!
+allsel             !!
+esize,elemSize     !!
+vatt,1,,1          !!
+VSWEEP,all         !!
+cm,COMPE_conc,elem !!
+!!
+
+!!
+lsel,s,loc,x,75                                                !!
+lsel,r,loc,z,36                                                !!
+lsel,r,loc,y,150-unbondedDepth-bondedDepth,150-unbondedDepth   !!
+nsll,s,1                                                       !!
+cm,COMPN_bondedConc,node                                       !!
+*get,ndmax,node,,num,maxd                                      !!
+ngen,2,ndmax,COMPN_bondedConc,,,0,0,0                          !!
+cmsel,u,COMPN_bondedConc                                       !!
+cm,COMPN_bondedRebar,node                                      !!
+cm,COMPN_temp,node                                             !!
+*get,nc,node,,count                                            !!
+node1=node(75,150-unbondedDepth-bondedDepth,36)                !!
+type,2                                                         !!
+mat,2                                                          !!
+secnum,1                                                       !!
+real,3                                                         !!
+*do,nthNode,1,nc-1,1                                           !!
+    cmsel,s,COMPN_temp                                         !!
+    node2=nnear(node1)                                         !!
+    e,node1,node2                                              !!
+    node1=node2                                                !!
+    cmsel,s,COMPN_temp                                         !!
+    nsel,u,node,,node1                                         !!
+    cm,COMPN_temp,node                                         !!
+*enddo                                                         !!
+*get,ndmax,node,,num,maxd                                      !!
+extNode=ndmax+1                                                !!
+n,extNode,75,150+exposedLength,36                              !!
+cmsel,a,COMPN_bondedRebar                                      !!
+e,node1,extNode                                                !!
+esln,s,1                                                       !!
+cm,COMPE_rebar,elem                                            !!
+allsel                                                         !!
+!!
+
+!!
+! Create real constant set to assign a scaled force-displacement curve to each spring
+cmsel,s,COMPN_bondedRebar
+*get,springCount,node,,count
+r,2,1,k0_linear/springCount
+!*do,nthPt,1,k0_points,1
+!    disp=k0_displacements(nthPt)
+!    f0=k0_forces(nthPt)
+!    scaledForce=f0/springCount
+!    rmodif,2,nthPt*2-1,disp
+!    rmodif,2,nthPt*2,scaledForce
+!*enddo
+!!
+
+TYPE,   3    !Defining element attributes-COMBIN39
+MAT,       2
+REAL,       2
+TSHAP,LINE
+!!
+cmsel,s,COMPN_bondedRebar       !!
+*get,nc,node,,count             !!
+rebarNode=0                     !!
+*do,nthNode,1,nc,1              !!
+    cmsel,s,COMPN_bondedRebar   !!
+    rebarNode=ndnext(rebarNode) !!
+    cmsel,s,COMPN_bondedConc    !!
+    concNode=nnear(rebarNode)   !!
+    nsel,s,node,,rebarNode      !!
+    nsel,a,node,,concNode       !!
+    e,rebarNode,concNode        !!
+*enddo                          !!
+allsel                          !!
+!!
+
+!!
+cmsel,s,COMPE_rebar !!
+nsle,s              !!
+d,all,ux,0,,,,uz    !!
+allsel              !!
+!!
+
+!!
+allsel                   !!
+/pnum,mat,1              !!
+/number,1                !!
+/view,1,1,2,3            !!
+/auto,1                  !!
+/eshape,1                !!
+/edge,,1                 !!
+eplot                    !!
+/trlcy,cm,0.7,COMPE_conc !!
+eplot                    !!
+!!
+
+save
+
+/solu
+
+!!
+asel,s,loc,y,0  !!
+da,all,uy,0     !!
+da,all,ux,0     !!
+da,all,uz,0     !!
+allsel          !!
+D,extNode,uy,20 !!
+!!
+
+outres,all,all
+NSUBST,10000!,1000,10
+TIME,20
+
+allsel
+solve
+
